@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">亲情远程</string>
+    <string name="start_casting">开始投屏</string>
+    <string name="stop_casting">停止投屏</string>
+    <string name="room_code_label">房间号</string>
+    <string name="share_link">分享链接</string>
+    <string name="status_idle">等待开始…</string>
+    <string name="status_connecting">正在连接…</string>
+    <string name="status_streaming">投屏中</string>
+    <string name="status_peer_connected">对方已连接</string>
+    <string name="notification_title">亲情远程投屏中</string>
+    <string name="notification_text">正在共享屏幕</string>
+    <string name="channel_name">投屏服务</string>
+    <string name="accessibility_description">亲情远程触控服务 — 接收远程触控指令</string>
+</resources>
