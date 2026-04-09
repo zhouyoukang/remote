@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
 import android.util.DisplayMetrics
 import android.util.Log
 import android.view.WindowManager
@@ -20,9 +21,12 @@ class CaptureService : Service() {
         const val EXTRA_DATA = "data"
         const val EXTRA_ROOM_CODE = "room_code"
         const val NOTIF_ID = 1001
+
+        var peerCallback: PeerManager.Callback? = null
     }
 
     private var peerManager: PeerManager? = null
+    private var wakeLock: PowerManager.WakeLock? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -46,7 +50,8 @@ class CaptureService : Service() {
             return START_NOT_STICKY
         }
 
-        startForegroundWithNotification()
+        startForegroundWithNotification(roomCode)
+        acquireWakeLock()
 
         val metrics = getScreenMetrics()
         val width = metrics.first.coerceAtMost(1280)
@@ -59,7 +64,8 @@ class CaptureService : Service() {
             projectionData = data,
             screenWidth = width,
             screenHeight = height,
-            screenDpi = metrics.third
+            screenDpi = metrics.third,
+            callback = peerCallback
         )
         peerManager?.start()
 
@@ -70,11 +76,29 @@ class CaptureService : Service() {
     override fun onDestroy() {
         peerManager?.stop()
         peerManager = null
+        releaseWakeLock()
+        peerCallback = null
         Log.i(TAG, "Capture stopped")
         super.onDestroy()
     }
 
-    private fun startForegroundWithNotification() {
+    private fun acquireWakeLock() {
+        val pm = getSystemService(POWER_SERVICE) as PowerManager
+        wakeLock = pm.newWakeLock(
+            PowerManager.PARTIAL_WAKE_LOCK,
+            "DaoRemote::Capture"
+        ).apply { acquire() }
+        Log.i(TAG, "WakeLock acquired")
+    }
+
+    private fun releaseWakeLock() {
+        wakeLock?.let {
+            if (it.isHeld) it.release()
+        }
+        wakeLock = null
+    }
+
+    private fun startForegroundWithNotification(roomCode: String) {
         val pendingIntent = PendingIntent.getActivity(
             this, 0,
             Intent(this, MainActivity::class.java),
@@ -82,7 +106,7 @@ class CaptureService : Service() {
         )
 
         val notification: Notification = NotificationCompat.Builder(this, App.CHANNEL_ID)
-            .setContentTitle(getString(R.string.notification_title))
+            .setContentTitle("${getString(R.string.notification_title)} \u00b7 $roomCode")
             .setContentText(getString(R.string.notification_text))
             .setSmallIcon(android.R.drawable.ic_menu_camera)
             .setContentIntent(pendingIntent)

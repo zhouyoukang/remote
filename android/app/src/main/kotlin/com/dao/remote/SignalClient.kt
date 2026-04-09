@@ -52,6 +52,7 @@ class SignalClient(
         ws = client.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
                 Log.i(TAG, "WebSocket connected")
+                reconnectAttempt = 0
             }
 
             override fun onMessage(webSocket: WebSocket, text: String) {
@@ -147,7 +148,7 @@ class SignalClient(
 
             when (type) {
                 "OPEN" -> {
-                    Log.i(TAG, "PeerJS OPEN — peer registered: $peerId")
+                    Log.i(TAG, "PeerJS OPEN \u2014 peer registered: $peerId")
                     listener.onOpen()
                 }
 
@@ -210,10 +211,20 @@ class SignalClient(
         }
     }
 
+    @Volatile private var reconnectAttempt = 0
+    private val maxReconnectDelay = 30_000L
+
     private fun scheduleReconnect() {
+        val delay = minOf(1000L * (1L shl minOf(reconnectAttempt, 5)), maxReconnectDelay)
+        reconnectAttempt++
+        Log.i(TAG, "Reconnecting in ${delay}ms (attempt $reconnectAttempt)")
         Thread {
-            Thread.sleep(3000)
-            connect()
+            Thread.sleep(delay)
+            if (ws == null) connect()
         }.start()
+    }
+
+    fun resetReconnect() {
+        reconnectAttempt = 0
     }
 }

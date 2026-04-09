@@ -56,6 +56,51 @@ class ControlService : AccessibilityService() {
                     "recents" -> svc.performGlobalAction(GLOBAL_ACTION_RECENTS)
                     "notifications" -> svc.performGlobalAction(GLOBAL_ACTION_NOTIFICATIONS)
 
+                    "volume_up" -> {
+                        val am = svc.getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager
+                        am.adjustVolume(android.media.AudioManager.ADJUST_RAISE, android.media.AudioManager.FLAG_SHOW_UI)
+                    }
+                    "volume_down" -> {
+                        val am = svc.getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager
+                        am.adjustVolume(android.media.AudioManager.ADJUST_LOWER, android.media.AudioManager.FLAG_SHOW_UI)
+                    }
+                    "volume_mute" -> {
+                        val am = svc.getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager
+                        am.adjustVolume(android.media.AudioManager.ADJUST_TOGGLE_MUTE, android.media.AudioManager.FLAG_SHOW_UI)
+                    }
+
+                    "lock_screen" -> {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                            svc.performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN)
+                        }
+                    }
+                    "power_dialog" -> {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                            svc.performGlobalAction(GLOBAL_ACTION_POWER_DIALOG)
+                        }
+                    }
+                    "quick_settings" -> svc.performGlobalAction(GLOBAL_ACTION_QUICK_SETTINGS)
+                    "split_screen" -> {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                            svc.performGlobalAction(GLOBAL_ACTION_TOGGLE_SPLIT_SCREEN)
+                        }
+                    }
+                    "screenshot" -> {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                            svc.performGlobalAction(GLOBAL_ACTION_TAKE_SCREENSHOT)
+                        }
+                    }
+
+                    "text" -> {
+                        val text = cmd.get("content")?.asString ?: return
+                        svc.injectText(text)
+                    }
+
+                    "keyevent" -> {
+                        val code = cmd.get("code")?.asInt ?: return
+                        svc.injectKeyEvent(code)
+                    }
+
                     "pinch" -> {
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                             val cx = cmd.get("cx").asFloat
@@ -134,31 +179,43 @@ class ControlService : AccessibilityService() {
         val builder = GestureDescription.Builder()
 
         if (scale > 1f) {
-            // Zoom in: fingers move apart
-            val path1 = Path().apply {
-                moveTo(cx - 20f, cy)
-                lineTo(cx - radius, cy)
-            }
-            val path2 = Path().apply {
-                moveTo(cx + 20f, cy)
-                lineTo(cx + radius, cy)
-            }
+            val path1 = Path().apply { moveTo(cx - 20f, cy); lineTo(cx - radius, cy) }
+            val path2 = Path().apply { moveTo(cx + 20f, cy); lineTo(cx + radius, cy) }
             builder.addStroke(GestureDescription.StrokeDescription(path1, 0, 300))
             builder.addStroke(GestureDescription.StrokeDescription(path2, 0, 300))
         } else {
-            // Zoom out: fingers move together
-            val path1 = Path().apply {
-                moveTo(cx - radius, cy)
-                lineTo(cx - 20f, cy)
-            }
-            val path2 = Path().apply {
-                moveTo(cx + radius, cy)
-                lineTo(cx + 20f, cy)
-            }
+            val path1 = Path().apply { moveTo(cx - radius, cy); lineTo(cx - 20f, cy) }
+            val path2 = Path().apply { moveTo(cx + radius, cy); lineTo(cx + 20f, cy) }
             builder.addStroke(GestureDescription.StrokeDescription(path1, 0, 300))
             builder.addStroke(GestureDescription.StrokeDescription(path2, 0, 300))
         }
 
         dispatchGesture(builder.build(), null, null)
+    }
+
+    private fun injectText(text: String) {
+        val clipboard = getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("remote", text))
+        performGlobalAction(GLOBAL_ACTION_BACK)
+        Thread.sleep(50)
+        val node = rootInActiveWindow
+        node?.let {
+            val focused = it.findFocus(android.view.accessibility.AccessibilityNodeInfo.FOCUS_INPUT)
+            focused?.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_PASTE)
+        }
+    }
+
+    private fun injectKeyEvent(keyCode: Int) {
+        try {
+            val inst = android.app.Instrumentation()
+            Thread { inst.sendKeyDownUpSync(keyCode) }.start()
+        } catch (e: Exception) {
+            Log.w(TAG, "keyevent via shell: $keyCode")
+            try {
+                Runtime.getRuntime().exec(arrayOf("input", "keyevent", keyCode.toString()))
+            } catch (ex: Exception) {
+                Log.e(TAG, "keyevent failed: ${ex.message}")
+            }
+        }
     }
 }
