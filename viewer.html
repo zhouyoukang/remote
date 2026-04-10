@@ -1,374 +1,1211 @@
 <!doctype html>
 <html lang="zh-CN">
-<head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"/>
-<meta name="apple-mobile-web-app-capable" content="yes"/>
-<meta name="mobile-web-app-capable" content="yes"/>
-<meta name="theme-color" content="#0a0a1a"/>
-<title>亲情远程</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{width:100%;height:100%;overflow:hidden;background:#0a0a1a;font-family:-apple-system,system-ui,sans-serif;color:#fff;touch-action:none}
-#joinScreen{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding:24px;background:linear-gradient(135deg,#0a0a1a,#1a1a3e)}
-#joinScreen h1{font-size:28px;font-weight:700;margin-bottom:8px}
-#joinScreen p{color:#888;font-size:14px;margin-bottom:40px}
-#roomInput{width:260px;height:56px;border:2px solid #333;border-radius:16px;background:#111;color:#fff;font-size:28px;text-align:center;letter-spacing:8px;outline:none;text-transform:uppercase}
-#roomInput:focus{border-color:#4f6ef7}
-#joinBtn{width:260px;height:52px;margin-top:20px;border:none;border-radius:14px;background:linear-gradient(135deg,#4f6ef7,#6c5ce7);color:#fff;font-size:18px;font-weight:600;cursor:pointer;transition:transform .1s}
-#joinBtn:active{transform:scale(.96)}
-#joinStatus{margin-top:16px;color:#888;font-size:13px;min-height:20px}
-.error{color:#ff6b6b!important}
-#viewerScreen{display:none;width:100%;height:100%;position:relative}
-#remoteVideo{width:100%;height:100%;object-fit:contain;background:#000}
-#touchLayer{position:absolute;top:0;left:0;width:100%;height:100%;z-index:10}
-#navBar{position:fixed;bottom:0;left:0;right:0;height:52px;display:none;align-items:center;justify-content:space-around;background:rgba(10,10,26,.9);backdrop-filter:blur(8px);border-top:1px solid rgba(255,255,255,.08);z-index:20;padding-bottom:env(safe-area-inset-bottom)}
-.nb{width:44px;height:40px;border:none;background:none;color:#aaa;font-size:18px;cursor:pointer;border-radius:8px;transition:background .15s;display:flex;align-items:center;justify-content:center}
-.nb:active{background:rgba(255,255,255,.12);color:#fff}
-.nb svg{width:20px;height:20px;fill:currentColor}
-#statusOverlay{position:fixed;top:12px;right:12px;padding:4px 10px;border-radius:8px;background:rgba(0,0,0,.6);font-size:11px;color:#4caf50;z-index:30;display:none;font-variant-numeric:tabular-nums}
-#statusOverlay.warn{color:#ff9800}
-#fsBtn{position:fixed;top:12px;left:12px;width:36px;height:36px;border:none;border-radius:8px;background:rgba(0,0,0,.5);color:#fff;font-size:16px;cursor:pointer;z-index:30;display:none}
-.ripple{position:absolute;width:40px;height:40px;border-radius:50%;background:rgba(79,110,247,.4);transform:translate(-50%,-50%) scale(0);animation:rippleA .4s ease-out forwards;pointer-events:none;z-index:15}
-@keyframes rippleA{to{transform:translate(-50%,-50%) scale(2.5);opacity:0}}
-#reconnectBanner{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);padding:16px 28px;border-radius:12px;background:rgba(0,0,0,.8);color:#fff;font-size:15px;z-index:40;display:none;text-align:center}
-#extMenu{position:fixed;bottom:56px;left:0;right:0;display:none;flex-wrap:wrap;justify-content:center;gap:6px;padding:12px 8px;background:rgba(10,10,26,.95);backdrop-filter:blur(8px);border-top:1px solid rgba(255,255,255,.06);z-index:19}
-.em{min-width:56px;height:36px;border:1px solid rgba(255,255,255,.12);border-radius:8px;background:none;color:#ccc;font-size:12px;cursor:pointer;padding:0 10px}
-.em:active{background:rgba(79,110,247,.3);color:#fff}
-#kbOverlay{position:fixed;bottom:56px;left:0;right:0;display:none;padding:8px;background:rgba(10,10,26,.95);backdrop-filter:blur(8px);z-index:21;border-top:1px solid rgba(255,255,255,.06)}
-#kbInput{width:100%;height:42px;border:1px solid #333;border-radius:10px;background:#111;color:#fff;font-size:16px;padding:0 14px;outline:none}
-#kbInput:focus{border-color:#4f6ef7}
-</style>
-</head>
-<body>
-<div id="joinScreen">
-  <h1>亲情远程</h1>
-  <p>输入房间号 连接家人手机</p>
-  <input id="roomInput" type="text" maxlength="6" placeholder="______" autocomplete="off" autofocus/>
-  <button id="joinBtn">连接</button>
-  <div id="joinStatus"></div>
-</div>
-<div id="viewerScreen">
-  <video id="remoteVideo" autoplay playsinline muted></video>
-  <div id="touchLayer"></div>
-  <button id="fsBtn" onclick="goFullscreen()">⛶</button>
-  <div id="statusOverlay">P2P</div>
-</div>
-<div id="reconnectBanner">连接断开，正在重连…</div>
-<div id="extMenu">
-  <button class="em" onclick="sendCmd({type:'volume_up'})">🔊+</button>
-  <button class="em" onclick="sendCmd({type:'volume_down'})">🔉-</button>
-  <button class="em" onclick="sendCmd({type:'volume_mute'})">🔇</button>
-  <button class="em" onclick="sendCmd({type:'lock_screen'})">🔒锁屏</button>
-  <button class="em" onclick="sendCmd({type:'screenshot'})">📸截图</button>
-  <button class="em" onclick="sendCmd({type:'quick_settings'})">⚙快设</button>
-  <button class="em" onclick="sendCmd({type:'power_dialog'})">⏻电源</button>
-  <button class="em" onclick="sendCmd({type:'split_screen'})">⊟分屏</button>
-  <button class="em" onclick="toggleKb()">⌨输入</button>
-</div>
-<div id="kbOverlay">
-  <input id="kbInput" type="text" placeholder="输入文字后回车发送…" autocomplete="off"/>
-</div>
-<div id="navBar">
-  <button class="nb" onclick="sendCmd({type:'notifications'})" title="通知"><svg viewBox="0 0 24 24"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg></button>
-  <button class="nb" onclick="sendCmd({type:'back'})" title="返回"><svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg></button>
-  <button class="nb" onclick="sendCmd({type:'home'})" title="主页"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/></svg></button>
-  <button class="nb" onclick="sendCmd({type:'recents'})" title="最近"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="2"/></svg></button>
-  <button class="nb" onclick="toggleExtMenu()" title="更多" id="moreBtn">···</button>
-</div>
-<script>
-const PEERJS_HOST="0.peerjs.com",PEERJS_PORT=443,PEERJS_PATH="/peerjs",PEERJS_KEY="peerjs";
-const ICE_SERVERS=[
-  {urls:"stun:stun.l.google.com:19302"},
-  {urls:"stun:stun1.l.google.com:19302"},
-  {urls:"stun:stun2.l.google.com:19302"},
-  {urls:"stun:stun.miwifi.com:3478"},
-  {urls:"stun:stun.qq.com:3478"},
-  {urls:"stun:stun.services.mozilla.com:3478"},
-  {urls:"turn:openrelay.metered.ca:443",username:"openrelayproject",credential:"openrelayproject"},
-  {urls:"turn:openrelay.metered.ca:443?transport=tcp",username:"openrelayproject",credential:"openrelayproject"},
-  {urls:"turn:openrelay.metered.ca:80",username:"openrelayproject",credential:"openrelayproject"}
-];
-
-let ws=null,pc=null,dc=null;
-let myPeerId="",hostPeerId="",currentRoom="";
-let videoEl,touchEl,statusEl,reconnectEl;
-let screenW=0,screenH=0;
-let statsInterval=null,wakeLock=null;
-let reconnecting=false,reconnectAttempt=0;
-let extMenuOpen=false,kbOpen=false;
-
-const params=new URLSearchParams(location.search);
-const urlRoom=params.get("r")||params.get("room")||"";
-
-window.addEventListener("DOMContentLoaded",()=>{
-  videoEl=document.getElementById("remoteVideo");
-  touchEl=document.getElementById("touchLayer");
-  statusEl=document.getElementById("statusOverlay");
-  reconnectEl=document.getElementById("reconnectBanner");
-
-  if(urlRoom){document.getElementById("roomInput").value=urlRoom;joinRoom(urlRoom)}
-
-  document.getElementById("joinBtn").addEventListener("click",()=>{
-    const c=document.getElementById("roomInput").value.trim().toUpperCase();
-    if(c.length>=4)joinRoom(c);
-  });
-  document.getElementById("roomInput").addEventListener("keydown",e=>{
-    if(e.key==="Enter")document.getElementById("joinBtn").click();
-  });
-  document.getElementById("kbInput").addEventListener("keydown",e=>{
-    if(e.key==="Enter"){
-      const v=e.target.value;
-      if(v)sendCmd({type:"text",content:v});
-      e.target.value="";
-    }
-  });
-  setupTouch();
-});
-
-function joinRoom(room){
-  cleanup();
-  currentRoom=room;
-  hostPeerId="dao-host-"+room;
-  myPeerId="dao-view-"+room+"-"+Math.random().toString(36).slice(2,8);
-  const token=crypto.randomUUID?crypto.randomUUID():Date.now().toString();
-  setStatus("连接信令服务器…");
-
-  const url=`wss://${PEERJS_HOST}:${PEERJS_PORT}${PEERJS_PATH}?key=${PEERJS_KEY}&id=${encodeURIComponent(myPeerId)}&token=${token}`;
-  ws=new WebSocket(url);
-
-  ws.onopen=()=>{setStatus("已连接信令, 等待主机…");reconnectAttempt=0};
-  ws.onmessage=e=>{
-    const msg=JSON.parse(e.data);
-    switch(msg.type){
-      case "OPEN":
-        setStatus("信令就绪, 请求连接…");
-        sendSignal("OFFER",hostPeerId,{sdp:{type:"offer",sdp:"hello"},type:"media",connectionId:"hello_"+Date.now(),browser:navigator.userAgent.slice(0,20)});
-        break;
-      case "OFFER":
-        if(msg.payload&&msg.payload.sdp&&msg.payload.sdp.sdp!=="hello")handleOffer(msg.src,msg.payload.sdp);
-        break;
-      case "ANSWER":
-        if(msg.payload&&msg.payload.sdp)pc&&pc.setRemoteDescription(new RTCSessionDescription(msg.payload.sdp));
-        break;
-      case "CANDIDATE":
-        if(msg.payload&&msg.payload.candidate)pc&&pc.addIceCandidate(new RTCIceCandidate(msg.payload.candidate));
-        break;
-      case "ERROR":
-        setStatus("错误: "+(msg.payload||""),true);
-        break;
-    }
-  };
-  ws.onerror=()=>setStatus("信令连接失败",true);
-  ws.onclose=()=>{
-    if(!pc||pc.connectionState!=="connected"){
-      const delay=Math.min(1000*Math.pow(2,Math.min(reconnectAttempt,5)),30000);
-      reconnectAttempt++;
-      setStatus(`信令断开, ${Math.round(delay/1000)}秒后重连…`,true);
-      setTimeout(()=>joinRoom(room),delay);
-    }
-  };
-}
-
-function sendSignal(type,dst,payload){
-  if(!ws||ws.readyState!==1)return;
-  ws.send(JSON.stringify({type,payload,dst}));
-}
-
-async function handleOffer(src,sdpObj){
-  setStatus("收到主机邀请, 建立P2P…");
-  if(pc){try{pc.close()}catch(e){}}
-  dc=null;
-
-  pc=new RTCPeerConnection({iceServers:ICE_SERVERS,sdpSemantics:"unified-plan"});
-
-  pc.onicecandidate=e=>{
-    if(e.candidate)sendSignal("CANDIDATE",src,{candidate:{candidate:e.candidate.candidate,sdpMLineIndex:e.candidate.sdpMLineIndex,sdpMid:e.candidate.sdpMid},type:"media"});
-  };
-
-  pc.ontrack=e=>{
-    if(e.streams&&e.streams[0]){videoEl.srcObject=e.streams[0];showViewer()}
-  };
-
-  pc.ondatachannel=e=>{
-    dc=e.channel;
-    dc.onopen=()=>console.log("DC open: "+dc.label());
-    dc.onmessage=ev=>{
-      try{
-        const msg=JSON.parse(ev.data);
-        if(msg.type==="screenInfo"){screenW=msg.w;screenH=msg.h;console.log("Screen: "+screenW+"x"+screenH)}
-      }catch(ex){}
-    };
-  };
-
-  pc.oniceconnectionstatechange=()=>{
-    const s=pc.iceConnectionState;
-    if(s==="connected"||s==="completed"){
-      statusEl.textContent="P2P ✓";statusEl.className="";statusEl.style.display="block";
-      reconnectEl.style.display="none";reconnecting=false;
-      startStats();acquireWakeLock();
-    }else if(s==="disconnected"||s==="failed"){
-      statusEl.textContent="⚠ 断开";statusEl.className="warn";stopStats();
-      if(!reconnecting){reconnecting=true;reconnectEl.style.display="block";setTimeout(()=>joinRoom(currentRoom),2000)}
-    }
-  };
-
-  await pc.setRemoteDescription(new RTCSessionDescription(sdpObj));
-  const answer=await pc.createAnswer();
-  await pc.setLocalDescription(answer);
-  sendSignal("ANSWER",src,{sdp:{type:answer.type,sdp:answer.sdp},type:"media",browser:"web"});
-}
-
-function showViewer(){
-  document.getElementById("joinScreen").style.display="none";
-  document.getElementById("viewerScreen").style.display="block";
-  document.getElementById("navBar").style.display="flex";
-  document.getElementById("fsBtn").style.display="block";
-  statusEl.style.display="block";
-  videoEl.addEventListener("loadedmetadata",()=>{screenW=videoEl.videoWidth;screenH=videoEl.videoHeight});
-  videoEl.addEventListener("resize",()=>{screenW=videoEl.videoWidth;screenH=videoEl.videoHeight});
-}
-
-function cleanup(){
-  stopStats();
-  if(dc){try{dc.close()}catch(e){}}dc=null;
-  if(pc){try{pc.close()}catch(e){}}pc=null;
-  if(ws){try{ws.close()}catch(e){}}ws=null;
-}
-
-function toggleExtMenu(){
-  extMenuOpen=!extMenuOpen;
-  document.getElementById("extMenu").style.display=extMenuOpen?"flex":"none";
-  if(extMenuOpen&&kbOpen)toggleKb();
-}
-
-function toggleKb(){
-  kbOpen=!kbOpen;
-  document.getElementById("kbOverlay").style.display=kbOpen?"block":"none";
-  if(kbOpen){document.getElementById("kbInput").focus();if(extMenuOpen)toggleExtMenu()}
-}
-
-let prevBytes=0,prevTime=0;
-function startStats(){
-  stopStats();prevBytes=0;prevTime=Date.now();
-  statsInterval=setInterval(async()=>{
-    if(!pc)return;
-    try{
-      const stats=await pc.getStats();
-      let bytes=0,fps=0,rtt="";
-      stats.forEach(r=>{
-        if(r.type==="inbound-rtp"&&r.kind==="video"){bytes=r.bytesReceived||0;fps=r.framesPerSecond||0}
-        if(r.type==="candidate-pair"&&r.state==="succeeded")rtt=r.currentRoundTripTime?Math.round(r.currentRoundTripTime*1000)+"ms":"";
-      });
-      const now=Date.now(),dt=(now-prevTime)/1000;
-      const kbps=dt>0&&prevBytes>0?Math.round((bytes-prevBytes)*8/dt/1000):0;
-      prevBytes=bytes;prevTime=now;
-      const p=[];
-      if(fps>0)p.push(fps+"fps");if(kbps>0)p.push(kbps+"kb/s");if(rtt)p.push(rtt);
-      if(p.length>0)statusEl.textContent=p.join(" · ");
-    }catch(e){}
-  },1000);
-}
-function stopStats(){if(statsInterval){clearInterval(statsInterval);statsInterval=null}}
-
-async function acquireWakeLock(){try{if("wakeLock"in navigator)wakeLock=await navigator.wakeLock.request("screen")}catch(e){}}
-
-function setStatus(text,isError){
-  const el=document.getElementById("joinStatus");
-  if(el){el.textContent=text;el.className=isError?"error":""}
-}
-
-function goFullscreen(){
-  const el=document.documentElement;
-  (el.requestFullscreen||el.webkitRequestFullscreen||el.msRequestFullscreen).call(el);
-}
-
-function sendCmd(cmd){
-  if(!dc||dc.readyState!=="open")return;
-  dc.send(JSON.stringify(cmd));
-}
-
-function videoCoords(cx,cy){
-  if(!screenW||!screenH)return null;
-  const r=videoEl.getBoundingClientRect();
-  const va=screenW/screenH,ra=r.width/r.height;
-  let dw,dh,ox,oy;
-  if(ra>va){dh=r.height;dw=dh*va;ox=r.left+(r.width-dw)/2;oy=r.top}
-  else{dw=r.width;dh=dw/va;ox=r.left;oy=r.top+(r.height-dh)/2}
-  const nx=(cx-ox)/dw,ny=(cy-oy)/dh;
-  if(nx<0||nx>1||ny<0||ny>1)return null;
-  return{x:Math.round(nx*screenW),y:Math.round(ny*screenH)};
-}
-
-function setupTouch(){
-  let st=null,sTime=0,moved=false,lpTimer=null;
-
-  touchEl.addEventListener("touchstart",e=>{
-    e.preventDefault();
-    if(e.touches.length===1){
-      const t=e.touches[0];st={x:t.clientX,y:t.clientY};sTime=Date.now();moved=false;
-      lpTimer=setTimeout(()=>{
-        if(!moved){const c=videoCoords(t.clientX,t.clientY);if(c)sendCmd({type:"longpress",x:c.x,y:c.y,duration:1000});st=null}
-      },600);
-    }else if(e.touches.length===2){clearTimeout(lpTimer);st=null}
-  },{passive:false});
-
-  touchEl.addEventListener("touchmove",e=>{
-    e.preventDefault();
-    if(st&&e.touches.length===1){
-      const t=e.touches[0];
-      if(Math.abs(t.clientX-st.x)>8||Math.abs(t.clientY-st.y)>8){moved=true;clearTimeout(lpTimer)}
-    }
-  },{passive:false});
-
-  touchEl.addEventListener("touchend",e=>{
-    e.preventDefault();clearTimeout(lpTimer);
-    if(!st)return;
-    const elapsed=Date.now()-sTime;
-    if(e.changedTouches.length===1){
-      const t=e.changedTouches[0];
-      if(!moved&&elapsed<500){const c=videoCoords(t.clientX,t.clientY);if(c){sendCmd({type:"tap",x:c.x,y:c.y});showRipple(t.clientX,t.clientY)}}
-      else if(moved){const c1=videoCoords(st.x,st.y),c2=videoCoords(t.clientX,t.clientY);if(c1&&c2)sendCmd({type:"swipe",x1:c1.x,y1:c1.y,x2:c2.x,y2:c2.y,duration:Math.min(elapsed,500)})}
-    }
-    st=null;moved=false;
-  },{passive:false});
-
-  let ms=null,mm=false,mt=0;
-  touchEl.addEventListener("mousedown",e=>{ms={x:e.clientX,y:e.clientY};mt=Date.now();mm=false});
-  touchEl.addEventListener("mousemove",e=>{if(ms&&(Math.abs(e.clientX-ms.x)>5||Math.abs(e.clientY-ms.y)>5))mm=true});
-  touchEl.addEventListener("mouseup",e=>{
-    if(!ms)return;const elapsed=Date.now()-mt;
-    if(!mm){const c=videoCoords(e.clientX,e.clientY);if(c){sendCmd({type:"tap",x:c.x,y:c.y});showRipple(e.clientX,e.clientY)}}
-    else{const c1=videoCoords(ms.x,ms.y),c2=videoCoords(e.clientX,e.clientY);if(c1&&c2)sendCmd({type:"swipe",x1:c1.x,y1:c1.y,x2:c2.x,y2:c2.y,duration:Math.min(elapsed,500)})}
-    ms=null;
-  });
-
-  touchEl.addEventListener("wheel",e=>{
-    e.preventDefault();const c=videoCoords(e.clientX,e.clientY);
-    if(c)sendCmd({type:"scroll",x:c.x,y:c.y,dx:0,dy:-e.deltaY*2});
-  },{passive:false});
-
-  let pd0=0;
-  touchEl.addEventListener("touchstart",e=>{
-    if(e.touches.length===2){const dx=e.touches[0].clientX-e.touches[1].clientX,dy=e.touches[0].clientY-e.touches[1].clientY;pd0=Math.hypot(dx,dy)}
-  },{passive:true});
-  touchEl.addEventListener("touchend",e=>{
-    if(pd0>0&&e.touches.length===0&&e.changedTouches.length===2){
-      const dx=e.changedTouches[0].clientX-e.changedTouches[1].clientX,dy=e.changedTouches[0].clientY-e.changedTouches[1].clientY;
-      const d1=Math.hypot(dx,dy),scale=d1/pd0;
-      if(Math.abs(scale-1)>.15){
-        const cx=(e.changedTouches[0].clientX+e.changedTouches[1].clientX)/2,cy=(e.changedTouches[0].clientY+e.changedTouches[1].clientY)/2;
-        const c=videoCoords(cx,cy);if(c)sendCmd({type:"pinch",cx:c.x,cy:c.y,scale:Math.round(scale*100)/100});
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"
+    />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <title>亲情远程</title>
+    <meta name="theme-color" content="#0a0a1a" />
+    <link
+      rel="manifest"
+      href="data:application/json,{%22name%22:%22亲情远程%22,%22short_name%22:%22远程%22,%22display%22:%22standalone%22,%22background_color%22:%22%230a0a1a%22,%22theme_color%22:%22%230a0a1a%22}"
+    />
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        -webkit-tap-highlight-color: transparent;
       }
-      pd0=0;
-    }
-  },{passive:true});
-}
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #0a0a1a;
+        font-family: -apple-system, system-ui, sans-serif;
+        color: #fff;
+        touch-action: none;
+      }
 
-function showRipple(x,y){
-  const r=document.createElement("div");r.className="ripple";r.style.left=x+"px";r.style.top=y+"px";
-  touchEl.appendChild(r);setTimeout(()=>r.remove(),400);
-}
-</script>
-</body>
+      /* --- Join Screen --- */
+      #joinScreen {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        padding: 24px;
+        background: linear-gradient(135deg, #0a0a1a 0%, #1a1a3e 100%);
+      }
+      #joinScreen h1 {
+        font-size: 28px;
+        font-weight: 700;
+        margin-bottom: 8px;
+      }
+      #joinScreen p {
+        color: #888;
+        font-size: 14px;
+        margin-bottom: 40px;
+      }
+      #roomInput {
+        width: 260px;
+        height: 56px;
+        border: 2px solid #333;
+        border-radius: 16px;
+        background: #111;
+        color: #fff;
+        font-size: 28px;
+        text-align: center;
+        letter-spacing: 8px;
+        outline: none;
+        text-transform: uppercase;
+      }
+      #roomInput:focus {
+        border-color: #4f6ef7;
+      }
+      #joinBtn {
+        width: 260px;
+        height: 52px;
+        margin-top: 20px;
+        border: none;
+        border-radius: 14px;
+        background: linear-gradient(135deg, #4f6ef7, #6c5ce7);
+        color: #fff;
+        font-size: 18px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: transform 0.1s;
+      }
+      #joinBtn:active {
+        transform: scale(0.96);
+      }
+      #joinStatus {
+        margin-top: 16px;
+        color: #888;
+        font-size: 13px;
+        min-height: 20px;
+      }
+      .error {
+        color: #ff6b6b !important;
+      }
+
+      /* --- Viewer Screen --- */
+      #viewerScreen {
+        display: none;
+        width: 100%;
+        height: 100%;
+        position: relative;
+      }
+      #remoteVideo {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        background: #000;
+      }
+      #touchLayer {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 10;
+      }
+
+      /* --- Nav Bar --- */
+      #navBar {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 48px;
+        display: none;
+        align-items: center;
+        justify-content: space-around;
+        background: rgba(10, 10, 26, 0.85);
+        backdrop-filter: blur(8px);
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        z-index: 20;
+        padding-bottom: env(safe-area-inset-bottom);
+      }
+      #navBar button {
+        width: 48px;
+        height: 40px;
+        border: none;
+        background: none;
+        color: #aaa;
+        font-size: 20px;
+        cursor: pointer;
+        border-radius: 8px;
+        transition: background 0.15s;
+      }
+      #navBar button:active {
+        background: rgba(255, 255, 255, 0.12);
+        color: #fff;
+      }
+      #navBar button svg {
+        width: 22px;
+        height: 22px;
+        fill: currentColor;
+      }
+
+      /* --- Status Overlay --- */
+      #statusOverlay {
+        position: fixed;
+        top: 12px;
+        right: 12px;
+        padding: 4px 10px;
+        border-radius: 8px;
+        background: rgba(0, 0, 0, 0.6);
+        font-size: 11px;
+        color: #4caf50;
+        z-index: 30;
+        display: none;
+        font-variant-numeric: tabular-nums;
+      }
+      #statusOverlay.warn {
+        color: #ff9800;
+      }
+
+      /* --- Fullscreen Button --- */
+      #fsBtn {
+        position: fixed;
+        top: 12px;
+        left: 12px;
+        width: 36px;
+        height: 36px;
+        border: none;
+        border-radius: 8px;
+        background: rgba(0, 0, 0, 0.5);
+        color: #fff;
+        font-size: 16px;
+        cursor: pointer;
+        z-index: 30;
+        display: none;
+      }
+
+      /* --- Tap Ripple --- */
+      .ripple {
+        position: absolute;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: rgba(79, 110, 247, 0.4);
+        transform: translate(-50%, -50%) scale(0);
+        animation: rippleAnim 0.4s ease-out forwards;
+        pointer-events: none;
+        z-index: 15;
+      }
+      @keyframes rippleAnim {
+        to {
+          transform: translate(-50%, -50%) scale(2.5);
+          opacity: 0;
+        }
+      }
+
+      /* --- Reconnect Banner --- */
+      #reconnectBanner {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        padding: 20px 32px;
+        border-radius: 16px;
+        background: rgba(0, 0, 0, 0.85);
+        color: #fff;
+        font-size: 16px;
+        z-index: 40;
+        display: none;
+        text-align: center;
+        backdrop-filter: blur(8px);
+        line-height: 1.6;
+      }
+      #reconnectBanner .sub {
+        font-size: 12px;
+        color: #999;
+        margin-top: 4px;
+      }
+
+      /* --- Keyboard Input --- */
+      #kbOverlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.6);
+        z-index: 50;
+        display: none;
+        align-items: center;
+        justify-content: center;
+      }
+      #kbOverlay.show {
+        display: flex;
+      }
+      #kbBox {
+        background: #1a1a2e;
+        border-radius: 16px;
+        padding: 20px;
+        width: min(320px, 90vw);
+        text-align: center;
+      }
+      #kbBox input {
+        width: 100%;
+        height: 44px;
+        border: 2px solid #333;
+        border-radius: 10px;
+        background: #111;
+        color: #fff;
+        font-size: 16px;
+        padding: 0 12px;
+        outline: none;
+        margin: 12px 0;
+      }
+      #kbBox input:focus {
+        border-color: #4f6ef7;
+      }
+      #kbBox button {
+        height: 40px;
+        border: none;
+        border-radius: 10px;
+        background: #4f6ef7;
+        color: #fff;
+        font-size: 15px;
+        padding: 0 24px;
+        cursor: pointer;
+        margin: 0 4px;
+      }
+      #kbBox button.cancel {
+        background: #333;
+      }
+
+      /* --- Extended Nav --- */
+      #extNav {
+        position: fixed;
+        bottom: 48px;
+        left: 0;
+        right: 0;
+        display: none;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 4px;
+        padding: 8px;
+        background: rgba(10, 10, 26, 0.92);
+        backdrop-filter: blur(8px);
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        z-index: 19;
+      }
+      #extNav.show {
+        display: flex;
+      }
+      #extNav button {
+        width: 52px;
+        height: 40px;
+        border: none;
+        background: rgba(255, 255, 255, 0.06);
+        color: #bbb;
+        font-size: 11px;
+        cursor: pointer;
+        border-radius: 8px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
+      }
+      #extNav button:active {
+        background: rgba(255, 255, 255, 0.15);
+        color: #fff;
+      }
+      #extNav button svg {
+        width: 18px;
+        height: 18px;
+        fill: currentColor;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Join Screen -->
+    <div id="joinScreen">
+      <h1>亲情远程</h1>
+      <p>输入房间号 连接家人手机</p>
+      <input
+        id="roomInput"
+        type="text"
+        maxlength="6"
+        placeholder="______"
+        autocomplete="off"
+        autofocus
+      />
+      <button id="joinBtn">连接</button>
+      <div id="joinStatus"></div>
+    </div>
+
+    <!-- Viewer Screen -->
+    <div id="viewerScreen">
+      <video id="remoteVideo" autoplay playsinline muted></video>
+      <div id="touchLayer"></div>
+      <button id="fsBtn" onclick="goFullscreen()">⛶</button>
+      <div id="statusOverlay">P2P</div>
+    </div>
+
+    <!-- Reconnect Banner -->
+    <div id="reconnectBanner">
+      <div>连接断开，正在重连…</div>
+      <div class="sub" id="reconnectInfo"></div>
+    </div>
+
+    <!-- Keyboard Input Overlay -->
+    <div id="kbOverlay" onclick="if (event.target === this) closeKb();">
+      <div id="kbBox">
+        <div style="color: #ccc; font-size: 14px">发送文字到远程设备</div>
+        <input id="kbInput" type="text" placeholder="输入内容…" />
+        <div>
+          <button class="cancel" onclick="closeKb()">取消</button>
+          <button onclick="sendKbText()">发送</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Extended Nav -->
+    <div id="extNav">
+      <button onclick="sendCmd({ type: 'volume_up' })">
+        <svg viewBox="0 0 24 24">
+          <polygon points="11,5 6,9 2,9 2,15 6,15 11,19" />
+          <path
+            d="M14 7.97c1.21.86 2 2.27 2 3.83 0 1.56-.79 2.97-2 3.83"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          /></svg
+        ><span>音量+</span>
+      </button>
+      <button onclick="sendCmd({ type: 'volume_down' })">
+        <svg viewBox="0 0 24 24">
+          <polygon points="11,5 6,9 2,9 2,15 6,15 11,19" /></svg
+        ><span>音量-</span>
+      </button>
+      <button onclick="sendCmd({ type: 'wake' })">
+        <svg viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="4" fill="currentColor" />
+          <path
+            d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M16.36 16.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M16.36 7.64l1.42-1.42"
+            stroke="currentColor"
+            stroke-width="2"
+            fill="none"
+          /></svg
+        ><span>亮屏</span>
+      </button>
+      <button onclick="sendCmd({ type: 'quick_settings' })">
+        <svg viewBox="0 0 24 24">
+          <path
+            d="M19.14 12.94a7.07 7.07 0 000-1.88l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.49.49 0 00-.59-.22l-2.39.96a7.04 7.04 0 00-1.62-.94l-.36-2.54a.48.48 0 00-.48-.41h-3.84a.48.48 0 00-.48.41l-.36 2.54c-.59.24-1.13.56-1.62.94l-2.39-.96a.49.49 0 00-.59.22L2.74 8.87a.48.48 0 00.12.61l2.03 1.58a7.07 7.07 0 000 1.88l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.26.41.48.41h3.84c.24 0 .44-.17.48-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.49.49 0 00-.12-.61l-2.03-1.58zM12 15.6A3.6 3.6 0 1115.6 12 3.6 3.6 0 0112 15.6z"
+          /></svg
+        ><span>快设</span>
+      </button>
+      <button onclick="sendCmd({ type: 'lock_screen' })">
+        <svg viewBox="0 0 24 24">
+          <rect
+            x="5"
+            y="11"
+            width="14"
+            height="10"
+            rx="2"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          />
+          <path
+            d="M8 11V7a4 4 0 018 0v4"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          /></svg
+        ><span>锁屏</span>
+      </button>
+      <button onclick="sendCmd({ type: 'screenshot' })">
+        <svg viewBox="0 0 24 24">
+          <rect
+            x="3"
+            y="3"
+            width="18"
+            height="18"
+            rx="2"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          />
+          <circle cx="12" cy="12" r="3" fill="currentColor" /></svg
+        ><span>截屏</span>
+      </button>
+    </div>
+
+    <!-- Navigation Bar -->
+    <div id="navBar">
+      <button onclick="sendCmd({ type: 'notifications' })" title="通知">
+        <svg viewBox="0 0 24 24">
+          <path
+            d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"
+            fill="currentColor"
+          />
+        </svg>
+      </button>
+      <button onclick="sendCmd({ type: 'back' })" title="返回">
+        <svg viewBox="0 0 24 24">
+          <path
+            d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"
+          />
+        </svg>
+      </button>
+      <button onclick="sendCmd({ type: 'home' })" title="主页">
+        <svg viewBox="0 0 24 24">
+          <circle
+            cx="12"
+            cy="12"
+            r="8"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          />
+        </svg>
+      </button>
+      <button onclick="sendCmd({ type: 'recents' })" title="最近">
+        <svg viewBox="0 0 24 24">
+          <rect
+            x="4"
+            y="4"
+            width="16"
+            height="16"
+            rx="2"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          />
+        </svg>
+      </button>
+      <button onclick="openKb()" title="键盘">
+        <svg viewBox="0 0 24 24">
+          <rect
+            x="2"
+            y="4"
+            width="20"
+            height="15"
+            rx="2"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          />
+          <line
+            x1="6"
+            y1="8"
+            x2="8"
+            y2="8"
+            stroke="currentColor"
+            stroke-width="2"
+          />
+          <line
+            x1="10"
+            y1="8"
+            x2="14"
+            y2="8"
+            stroke="currentColor"
+            stroke-width="2"
+          />
+          <line
+            x1="16"
+            y1="8"
+            x2="18"
+            y2="8"
+            stroke="currentColor"
+            stroke-width="2"
+          />
+          <line
+            x1="7"
+            y1="15"
+            x2="17"
+            y2="15"
+            stroke="currentColor"
+            stroke-width="2"
+          />
+        </svg>
+      </button>
+      <button onclick="toggleExtNav()" title="更多">
+        <svg viewBox="0 0 24 24">
+          <circle cx="12" cy="5" r="2" fill="currentColor" />
+          <circle cx="12" cy="12" r="2" fill="currentColor" />
+          <circle cx="12" cy="19" r="2" fill="currentColor" />
+        </svg>
+      </button>
+    </div>
+
+    <script>
+      // ============ CONFIG ============
+      const PEERJS_HOST = "0.peerjs.com";
+      const PEERJS_PORT = 443;
+      const PEERJS_PATH = "/peerjs";
+      const PEERJS_KEY = "peerjs";
+      const ICE_SERVERS = [
+        { urls: "stun:stun.l.google.com:19302" },
+        { urls: "stun:stun1.l.google.com:19302" },
+        { urls: "stun:stun2.l.google.com:19302" },
+        { urls: "stun:stun3.l.google.com:19302" },
+        { urls: "stun:stun4.l.google.com:19302" },
+        { urls: "stun:stun.miwifi.com:3478" },
+        { urls: "stun:stun.qq.com:3478" },
+        { urls: "stun:stun.chat.bilibili.com:3478" },
+        { urls: "stun:stun.services.mozilla.com:3478" },
+        {
+          urls: "turn:openrelay.metered.ca:443",
+          username: "openrelayproject",
+          credential: "openrelayproject",
+        },
+        {
+          urls: "turn:openrelay.metered.ca:443?transport=tcp",
+          username: "openrelayproject",
+          credential: "openrelayproject",
+        },
+        {
+          urls: "turn:openrelay.metered.ca:80",
+          username: "openrelayproject",
+          credential: "openrelayproject",
+        },
+        {
+          urls: "turns:openrelay.metered.ca:443",
+          username: "openrelayproject",
+          credential: "openrelayproject",
+        },
+      ];
+
+      // ============ STATE ============
+      let ws = null,
+        pc = null,
+        dc = null;
+      let myPeerId = "",
+        hostPeerId = "",
+        currentRoom = "";
+      let videoEl, touchEl, statusEl, reconnectEl;
+      let screenW = 0,
+        screenH = 0;
+      let statsInterval = null,
+        wakeLock = null;
+      let reconnecting = false;
+      let reconnectAttempt = 0;
+      let reconnectTimer = null;
+
+      // ============ INIT ============
+      const params = new URLSearchParams(location.search);
+      const urlRoom = params.get("r") || params.get("room") || "";
+
+      window.addEventListener("DOMContentLoaded", () => {
+        videoEl = document.getElementById("remoteVideo");
+        touchEl = document.getElementById("touchLayer");
+        statusEl = document.getElementById("statusOverlay");
+        reconnectEl = document.getElementById("reconnectBanner");
+
+        if (urlRoom) {
+          document.getElementById("roomInput").value = urlRoom;
+          joinRoom(urlRoom);
+        }
+
+        document.getElementById("joinBtn").addEventListener("click", () => {
+          const code = document
+            .getElementById("roomInput")
+            .value.trim()
+            .toUpperCase();
+          if (code.length >= 4) joinRoom(code);
+        });
+
+        document
+          .getElementById("roomInput")
+          .addEventListener("keydown", (e) => {
+            if (e.key === "Enter") document.getElementById("joinBtn").click();
+          });
+
+        setupTouch();
+      });
+
+      // ============ SIGNALING (PeerJS Protocol) ============
+      function joinRoom(room) {
+        currentRoom = room;
+        hostPeerId = "dao-host-" + room;
+        myPeerId =
+          "dao-view-" + room + "-" + Math.random().toString(36).slice(2, 8);
+        const token = crypto.randomUUID
+          ? crypto.randomUUID()
+          : Date.now().toString();
+
+        setStatus("连接信令服务器…");
+
+        const url = `wss://${PEERJS_HOST}:${PEERJS_PORT}${PEERJS_PATH}?key=${PEERJS_KEY}&id=${encodeURIComponent(myPeerId)}&token=${token}`;
+        ws = new WebSocket(url);
+
+        ws.onopen = () => setStatus("已连接信令, 等待主机…");
+
+        ws.onmessage = (e) => {
+          const msg = JSON.parse(e.data);
+          switch (msg.type) {
+            case "OPEN":
+              setStatus("信令就绪, 请求连接…");
+              // Send a lightweight "hello" offer to trigger host
+              sendSignal("OFFER", hostPeerId, {
+                sdp: { type: "offer", sdp: "hello" },
+                type: "media",
+                connectionId: "hello_" + Date.now(),
+                browser: navigator.userAgent.slice(0, 20),
+              });
+              break;
+            case "OFFER":
+              // Real offer from host
+              if (
+                msg.payload &&
+                msg.payload.sdp &&
+                msg.payload.sdp.sdp !== "hello"
+              ) {
+                handleOffer(msg.src, msg.payload.sdp);
+              }
+              break;
+            case "ANSWER":
+              if (msg.payload && msg.payload.sdp) {
+                pc &&
+                  pc.setRemoteDescription(
+                    new RTCSessionDescription(msg.payload.sdp),
+                  );
+              }
+              break;
+            case "CANDIDATE":
+              if (msg.payload && msg.payload.candidate) {
+                pc &&
+                  pc.addIceCandidate(
+                    new RTCIceCandidate(msg.payload.candidate),
+                  );
+              }
+              break;
+            case "ERROR":
+              setStatus("错误: " + (msg.payload || ""), true);
+              break;
+          }
+        };
+
+        ws.onerror = () => setStatus("信令连接失败", true);
+        ws.onclose = () => {
+          if (!pc || pc.connectionState !== "connected") {
+            reconnectAttempt++;
+            const delay = Math.min(
+              1000 * Math.pow(2, Math.min(reconnectAttempt, 5)),
+              30000,
+            );
+            setStatus(
+              `信令断开, ${Math.round(delay / 1000)}秒后重连(#${reconnectAttempt})…`,
+              true,
+            );
+            clearTimeout(reconnectTimer);
+            reconnectTimer = setTimeout(() => joinRoom(room), delay);
+          }
+        };
+      }
+
+      function sendSignal(type, dst, payload) {
+        if (!ws || ws.readyState !== 1) return;
+        ws.send(JSON.stringify({ type, payload, dst }));
+      }
+
+      // ============ WebRTC ============
+      async function handleOffer(src, sdpObj) {
+        setStatus("收到主机邀请, 建立P2P…");
+
+        pc = new RTCPeerConnection({
+          iceServers: ICE_SERVERS,
+          sdpSemantics: "unified-plan",
+        });
+
+        pc.onicecandidate = (e) => {
+          if (e.candidate) {
+            sendSignal("CANDIDATE", src, {
+              candidate: {
+                candidate: e.candidate.candidate,
+                sdpMLineIndex: e.candidate.sdpMLineIndex,
+                sdpMid: e.candidate.sdpMid,
+              },
+              type: "media",
+            });
+          }
+        };
+
+        pc.ontrack = (e) => {
+          if (e.streams && e.streams[0]) {
+            videoEl.srcObject = e.streams[0];
+            showViewer();
+          }
+        };
+
+        pc.ondatachannel = (e) => {
+          if (e.channel.label === "control") {
+            dc = e.channel;
+            dc.onopen = () => console.log("DataChannel open");
+            dc.onmessage = (msg) => {
+              try {
+                const data = JSON.parse(msg.data);
+                if (data.type === "screenInfo") {
+                  screenW = data.w;
+                  screenH = data.h;
+                  console.log(
+                    `Screen info: ${screenW}x${screenH} dpi=${data.dpi}`,
+                  );
+                }
+              } catch (ex) {}
+            };
+          }
+        };
+
+        pc.oniceconnectionstatechange = () => {
+          const s = pc.iceConnectionState;
+          if (s === "connected" || s === "completed") {
+            statusEl.textContent = "P2P \u2713";
+            statusEl.className = "";
+            statusEl.style.display = "block";
+            reconnectEl.style.display = "none";
+            reconnecting = false;
+            reconnectAttempt = 0;
+            startStats();
+            acquireWakeLock();
+          } else if (s === "disconnected" || s === "failed") {
+            statusEl.textContent = "\u26a0 \u65ad\u5f00";
+            statusEl.className = "warn";
+            stopStats();
+            if (!reconnecting) {
+              reconnecting = true;
+              reconnectAttempt++;
+              reconnectEl.style.display = "block";
+              const ri = document.getElementById("reconnectInfo");
+              if (ri) ri.textContent = `第 ${reconnectAttempt} 次重连…`;
+              const delay = Math.min(
+                1000 * Math.pow(1.5, Math.min(reconnectAttempt, 6)),
+                15000,
+              );
+              setTimeout(() => {
+                cleanup();
+                joinRoom(currentRoom);
+              }, delay);
+            }
+          }
+        };
+
+        await pc.setRemoteDescription(new RTCSessionDescription(sdpObj));
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+
+        sendSignal("ANSWER", src, {
+          sdp: { type: answer.type, sdp: answer.sdp },
+          type: "media",
+          browser: "web",
+        });
+      }
+
+      // ============ UI ============
+      function showViewer() {
+        document.getElementById("joinScreen").style.display = "none";
+        document.getElementById("viewerScreen").style.display = "block";
+        document.getElementById("navBar").style.display = "flex";
+        document.getElementById("fsBtn").style.display = "block";
+        statusEl.style.display = "block";
+
+        videoEl.addEventListener("loadedmetadata", () => {
+          screenW = videoEl.videoWidth;
+          screenH = videoEl.videoHeight;
+        });
+        videoEl.addEventListener("resize", () => {
+          screenW = videoEl.videoWidth;
+          screenH = videoEl.videoHeight;
+        });
+      }
+
+      function cleanup() {
+        stopStats();
+        if (dc) {
+          try {
+            dc.close();
+          } catch (e) {}
+          dc = null;
+        }
+        if (pc) {
+          try {
+            pc.close();
+          } catch (e) {}
+          pc = null;
+        }
+        if (ws) {
+          try {
+            ws.close();
+          } catch (e) {}
+          ws = null;
+        }
+      }
+
+      // ============ STATS ============
+      let prevBytes = 0,
+        prevTime = 0;
+      function startStats() {
+        stopStats();
+        prevBytes = 0;
+        prevTime = Date.now();
+        statsInterval = setInterval(async () => {
+          if (!pc) return;
+          try {
+            const stats = await pc.getStats();
+            let bytes = 0,
+              fps = 0,
+              rtt = "";
+            stats.forEach((r) => {
+              if (r.type === "inbound-rtp" && r.kind === "video") {
+                bytes = r.bytesReceived || 0;
+                fps = r.framesPerSecond || 0;
+              }
+              if (r.type === "candidate-pair" && r.state === "succeeded") {
+                rtt = r.currentRoundTripTime
+                  ? Math.round(r.currentRoundTripTime * 1000) + "ms"
+                  : "";
+              }
+            });
+            const now = Date.now();
+            const dt = (now - prevTime) / 1000;
+            const kbps =
+              dt > 0 && prevBytes > 0
+                ? Math.round(((bytes - prevBytes) * 8) / dt / 1000)
+                : 0;
+            prevBytes = bytes;
+            prevTime = now;
+            const parts = [];
+            if (fps > 0) parts.push(fps + "fps");
+            if (kbps > 0) parts.push(kbps + "kb/s");
+            if (rtt) parts.push(rtt);
+            if (parts.length > 0) {
+              statusEl.textContent = parts.join(" · ");
+              // Color code based on RTT
+              const rttMs = rtt ? parseInt(rtt) : 0;
+              if (rttMs > 200) {
+                statusEl.className = "warn";
+              } else {
+                statusEl.className = "";
+              }
+            }
+          } catch (e) {}
+        }, 1000);
+      }
+      function stopStats() {
+        if (statsInterval) {
+          clearInterval(statsInterval);
+          statsInterval = null;
+        }
+      }
+
+      // ============ WAKE LOCK ============
+      async function acquireWakeLock() {
+        try {
+          if ("wakeLock" in navigator)
+            wakeLock = await navigator.wakeLock.request("screen");
+        } catch (e) {}
+      }
+
+      function setStatus(text, isError) {
+        const el = document.getElementById("joinStatus");
+        el.textContent = text;
+        el.className = isError ? "error" : "";
+      }
+
+      function goFullscreen() {
+        const el = document.documentElement;
+        (
+          el.requestFullscreen ||
+          el.webkitRequestFullscreen ||
+          el.msRequestFullscreen
+        ).call(el);
+      }
+
+      // ============ TOUCH → COMMAND ============
+      function sendCmd(cmd) {
+        if (!dc || dc.readyState !== "open") return;
+        dc.send(JSON.stringify(cmd));
+      }
+
+      function videoCoords(clientX, clientY) {
+        if (!screenW || !screenH) return null;
+        const rect = videoEl.getBoundingClientRect();
+
+        // Calculate the actual video display area (object-fit: contain)
+        const videoAspect = screenW / screenH;
+        const rectAspect = rect.width / rect.height;
+
+        let dispW, dispH, offX, offY;
+        if (rectAspect > videoAspect) {
+          dispH = rect.height;
+          dispW = dispH * videoAspect;
+          offX = rect.left + (rect.width - dispW) / 2;
+          offY = rect.top;
+        } else {
+          dispW = rect.width;
+          dispH = dispW / videoAspect;
+          offX = rect.left;
+          offY = rect.top + (rect.height - dispH) / 2;
+        }
+
+        const nx = (clientX - offX) / dispW;
+        const ny = (clientY - offY) / dispH;
+
+        if (nx < 0 || nx > 1 || ny < 0 || ny > 1) return null;
+        return { x: Math.round(nx * screenW), y: Math.round(ny * screenH) };
+      }
+
+      function setupTouch() {
+        let startTouch = null,
+          startTime = 0,
+          moved = false;
+        let longPressTimer = null;
+
+        touchEl.addEventListener(
+          "touchstart",
+          (e) => {
+            e.preventDefault();
+            if (e.touches.length === 1) {
+              const t = e.touches[0];
+              startTouch = { x: t.clientX, y: t.clientY };
+              startTime = Date.now();
+              moved = false;
+              longPressTimer = setTimeout(() => {
+                if (!moved) {
+                  const c = videoCoords(t.clientX, t.clientY);
+                  if (c)
+                    sendCmd({
+                      type: "longpress",
+                      x: c.x,
+                      y: c.y,
+                      duration: 1000,
+                    });
+                  startTouch = null; // consumed
+                }
+              }, 600);
+            } else if (e.touches.length === 2) {
+              clearTimeout(longPressTimer);
+              startTouch = null;
+            }
+          },
+          { passive: false },
+        );
+
+        touchEl.addEventListener(
+          "touchmove",
+          (e) => {
+            e.preventDefault();
+            if (startTouch && e.touches.length === 1) {
+              const t = e.touches[0];
+              const dx = t.clientX - startTouch.x;
+              const dy = t.clientY - startTouch.y;
+              if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
+                moved = true;
+                clearTimeout(longPressTimer);
+              }
+            }
+            // Pinch detection
+            if (e.touches.length === 2) {
+              // handled in touchend
+            }
+          },
+          { passive: false },
+        );
+
+        touchEl.addEventListener(
+          "touchend",
+          (e) => {
+            e.preventDefault();
+            clearTimeout(longPressTimer);
+
+            if (!startTouch) return;
+
+            const elapsed = Date.now() - startTime;
+            if (e.changedTouches.length === 1) {
+              const t = e.changedTouches[0];
+              if (!moved && elapsed < 500) {
+                // Tap
+                const c = videoCoords(t.clientX, t.clientY);
+                if (c) {
+                  sendCmd({ type: "tap", x: c.x, y: c.y });
+                  showRipple(t.clientX, t.clientY);
+                }
+              } else if (moved) {
+                // Swipe
+                const c1 = videoCoords(startTouch.x, startTouch.y);
+                const c2 = videoCoords(t.clientX, t.clientY);
+                if (c1 && c2) {
+                  sendCmd({
+                    type: "swipe",
+                    x1: c1.x,
+                    y1: c1.y,
+                    x2: c2.x,
+                    y2: c2.y,
+                    duration: Math.min(elapsed, 500),
+                  });
+                }
+              }
+            }
+            startTouch = null;
+            moved = false;
+          },
+          { passive: false },
+        );
+
+        // Mouse support (desktop)
+        let mouseStart = null,
+          mouseMoved = false,
+          mouseTime = 0;
+
+        touchEl.addEventListener("mousedown", (e) => {
+          mouseStart = { x: e.clientX, y: e.clientY };
+          mouseTime = Date.now();
+          mouseMoved = false;
+        });
+
+        touchEl.addEventListener("mousemove", (e) => {
+          if (mouseStart) {
+            const dx = e.clientX - mouseStart.x;
+            const dy = e.clientY - mouseStart.y;
+            if (Math.abs(dx) > 5 || Math.abs(dy) > 5) mouseMoved = true;
+          }
+        });
+
+        touchEl.addEventListener("mouseup", (e) => {
+          if (!mouseStart) return;
+          const elapsed = Date.now() - mouseTime;
+          if (!mouseMoved) {
+            const c = videoCoords(e.clientX, e.clientY);
+            if (c) {
+              sendCmd({ type: "tap", x: c.x, y: c.y });
+              showRipple(e.clientX, e.clientY);
+            }
+          } else {
+            const c1 = videoCoords(mouseStart.x, mouseStart.y);
+            const c2 = videoCoords(e.clientX, e.clientY);
+            if (c1 && c2)
+              sendCmd({
+                type: "swipe",
+                x1: c1.x,
+                y1: c1.y,
+                x2: c2.x,
+                y2: c2.y,
+                duration: Math.min(elapsed, 500),
+              });
+          }
+          mouseStart = null;
+        });
+
+        // Scroll wheel → scroll command
+        touchEl.addEventListener(
+          "wheel",
+          (e) => {
+            e.preventDefault();
+            const c = videoCoords(e.clientX, e.clientY);
+            if (c)
+              sendCmd({
+                type: "scroll",
+                x: c.x,
+                y: c.y,
+                dx: 0,
+                dy: -e.deltaY * 2,
+              });
+          },
+          { passive: false },
+        );
+
+        // Pinch-to-zoom
+        let pinchDist0 = 0;
+        touchEl.addEventListener(
+          "touchstart",
+          (e) => {
+            if (e.touches.length === 2) {
+              const dx = e.touches[0].clientX - e.touches[1].clientX;
+              const dy = e.touches[0].clientY - e.touches[1].clientY;
+              pinchDist0 = Math.hypot(dx, dy);
+            }
+          },
+          { passive: true },
+        );
+        touchEl.addEventListener(
+          "touchend",
+          (e) => {
+            if (
+              pinchDist0 > 0 &&
+              e.touches.length === 0 &&
+              e.changedTouches.length === 2
+            ) {
+              const dx =
+                e.changedTouches[0].clientX - e.changedTouches[1].clientX;
+              const dy =
+                e.changedTouches[0].clientY - e.changedTouches[1].clientY;
+              const dist1 = Math.hypot(dx, dy);
+              const scale = dist1 / pinchDist0;
+              if (Math.abs(scale - 1) > 0.15) {
+                const cx =
+                  (e.changedTouches[0].clientX + e.changedTouches[1].clientX) /
+                  2;
+                const cy =
+                  (e.changedTouches[0].clientY + e.changedTouches[1].clientY) /
+                  2;
+                const c = videoCoords(cx, cy);
+                if (c)
+                  sendCmd({
+                    type: "pinch",
+                    cx: c.x,
+                    cy: c.y,
+                    scale: Math.round(scale * 100) / 100,
+                  });
+              }
+              pinchDist0 = 0;
+            }
+          },
+          { passive: true },
+        );
+      }
+
+      function showRipple(x, y) {
+        const r = document.createElement("div");
+        r.className = "ripple";
+        r.style.left = x + "px";
+        r.style.top = y + "px";
+        touchEl.appendChild(r);
+        setTimeout(() => r.remove(), 400);
+      }
+
+      // ============ KEYBOARD INPUT ============
+      function openKb() {
+        document.getElementById("kbOverlay").classList.add("show");
+        document.getElementById("kbInput").value = "";
+        setTimeout(() => document.getElementById("kbInput").focus(), 100);
+      }
+      function closeKb() {
+        document.getElementById("kbOverlay").classList.remove("show");
+      }
+      function sendKbText() {
+        const text = document.getElementById("kbInput").value;
+        if (text) sendCmd({ type: "text", content: text });
+        closeKb();
+      }
+      document.addEventListener("keydown", (e) => {
+        if (document.getElementById("kbOverlay").classList.contains("show")) {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            sendKbText();
+          }
+          if (e.key === "Escape") closeKb();
+          return;
+        }
+      });
+
+      // ============ EXTENDED NAV ============
+      function toggleExtNav() {
+        document.getElementById("extNav").classList.toggle("show");
+      }
+    </script>
+  </body>
 </html>
